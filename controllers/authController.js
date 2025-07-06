@@ -1,5 +1,4 @@
 // src/controllers/authController.js
-
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import supabase from '../config/supabaseClient.js';
@@ -31,11 +30,11 @@ export const login = async (req, res) => {
       { expiresIn: rememberMe ? '7d' : '1h' }
     );
 
-    // ✅ Cross-site cookie fix (vercel ↔ railway)
+    // ✅ Set cookie correctly for cross-site support (iOS Safari fix)
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true, // must be true on vercel+railway
-      sameSite: 'None', // must be None for cross-origin cookies
+      secure: true,        // required for sameSite: 'None'
+      sameSite: 'None',    // required for Vercel ↔ Railway + iOS Safari
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
 
