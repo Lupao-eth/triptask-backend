@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import rateLimit from 'express-rate-limit'; // ✅ Rate limiting
+import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/authRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
@@ -18,7 +18,7 @@ import userRoutes from './routes/users.js';
 
 const app = express();
 
-// Fix __dirname
+// Fix __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -45,7 +45,7 @@ app.use('/uploads', (req, res, next) => {
   }
 });
 
-// CORS setup
+// ✅ CORS config
 const allowedOrigins = [
   'https://triptask-frontend.vercel.app',
   'http://localhost:3000',
@@ -63,29 +63,29 @@ app.use(
         callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true,
+    credentials: true, // 👈 important for sending cookies
   })
 );
 
-// ✅ Global Rate Limiting Middleware
+// ✅ Global rate limiter
 const globalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute window
-  max: 100, // limit each IP to 100 requests per minute
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // limit each IP
   message: '⏱ Too many requests. Please try again later.',
 });
 app.use(globalLimiter);
 
-// Middleware
+// ✅ Middleware
 app.use(express.json());
 app.use(cookieParser());
 
-// Routes
+// ✅ Routes
 app.use('/auth', authRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/chats', chatRoutes);
 app.use('/users', userRoutes);
 
-// Start server
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () =>
   console.log(`✅ Server running on http://0.0.0.0:${PORT}`)

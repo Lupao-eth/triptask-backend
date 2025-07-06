@@ -31,11 +31,11 @@ export const login = async (req, res) => {
       { expiresIn: rememberMe ? '7d' : '1h' }
     );
 
-    // ✅ Set secure cookie
+    // ✅ Cross-site cookie fix (vercel ↔ railway)
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Lax',
+      secure: true, // must be true on vercel+railway
+      sameSite: 'None', // must be None for cross-origin cookies
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
 
@@ -82,8 +82,8 @@ export const getMe = async (req, res) => {
     console.error('❌ Token decode error:', err.message);
     res.clearCookie('token', {
       httpOnly: true,
-      sameSite: 'Lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'None',
+      secure: true,
     });
     res.status(401).json({ message: 'Invalid token' });
   }
@@ -93,8 +93,8 @@ export const getMe = async (req, res) => {
 export const logout = (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
-    sameSite: 'Lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None',
+    secure: true,
   });
   res.json({ message: 'Logged out successfully' });
 };
