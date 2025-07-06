@@ -37,6 +37,7 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: 'None',
+      domain: COOKIE_DOMAIN,
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
 
@@ -85,6 +86,7 @@ export const getMe = async (req, res) => {
       httpOnly: true,
       sameSite: 'None',
       secure: true,
+      domain: COOKIE_DOMAIN,
     });
     res.status(401).json({ message: 'Invalid token' });
   }
