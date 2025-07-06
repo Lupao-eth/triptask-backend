@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import supabase from '../config/supabaseClient.js';
 
+const COOKIE_DOMAIN = 'triptask-backend.up.railway.app'; // ✅ set to your Railway backend domain
+
 // 🔐 LOGIN
 export const login = async (req, res) => {
   const { email, password, rememberMe } = req.body;
@@ -30,11 +32,12 @@ export const login = async (req, res) => {
       { expiresIn: rememberMe ? '7d' : '1h' }
     );
 
-    // ✅ Set cookie correctly for cross-site support (iOS Safari fix)
+    // ✅ Set cookie with domain for iOS Safari & cross-origin
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,        // required for sameSite: 'None'
-      sameSite: 'None',    // required for Vercel ↔ Railway + iOS Safari
+      secure: true,
+      sameSite: 'None',
+      domain: COOKIE_DOMAIN,
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
 
@@ -83,6 +86,7 @@ export const getMe = async (req, res) => {
       httpOnly: true,
       sameSite: 'None',
       secure: true,
+      domain: COOKIE_DOMAIN,
     });
     res.status(401).json({ message: 'Invalid token' });
   }
@@ -94,6 +98,7 @@ export const logout = (req, res) => {
     httpOnly: true,
     sameSite: 'None',
     secure: true,
+    domain: COOKIE_DOMAIN,
   });
   res.json({ message: 'Logged out successfully' });
 };
