@@ -3,8 +3,6 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import supabase from '../config/supabaseClient.js';
 
-const COOKIE_DOMAIN = 'triptask-backend.up.railway.app'; // ✅ set to your Railway backend domain
-
 // 🔐 LOGIN
 export const login = async (req, res) => {
   const { email, password, rememberMe } = req.body;
@@ -25,19 +23,17 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Wrong password' });
     }
 
-    // ✅ Generate JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: rememberMe ? '7d' : '1h' }
     );
 
-    // ✅ Set cookie with domain for iOS Safari & cross-origin
+    // ✅ Set cookie WITHOUT `domain`
     res.cookie('token', token, {
       httpOnly: true,
       secure: true,
       sameSite: 'None',
-      domain: COOKIE_DOMAIN,
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
     });
 
@@ -86,7 +82,6 @@ export const getMe = async (req, res) => {
       httpOnly: true,
       sameSite: 'None',
       secure: true,
-      domain: COOKIE_DOMAIN,
     });
     res.status(401).json({ message: 'Invalid token' });
   }
@@ -98,7 +93,6 @@ export const logout = (req, res) => {
     httpOnly: true,
     sameSite: 'None',
     secure: true,
-    domain: COOKIE_DOMAIN,
   });
   res.json({ message: 'Logged out successfully' });
 };
