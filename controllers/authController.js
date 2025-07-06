@@ -1,42 +1,43 @@
-import jwt from 'jsonwebtoken'
-import bcrypt from 'bcrypt'
-import supabase from '../config/supabaseClient.js'
+// src/controllers/authController.js
+
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import supabase from '../config/supabaseClient.js';
 
 // 🔐 LOGIN
 export const login = async (req, res) => {
-  const { email, password, rememberMe } = req.body
+  const { email, password, rememberMe } = req.body;
 
   try {
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
-      .single()
+      .single();
 
     if (error || !user) {
-      return res.status(404).json({ message: 'User not found' })
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password)
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Wrong password' })
+      return res.status(401).json({ message: 'Wrong password' });
     }
 
-    // ✅ Store role in token (for UI use)
+    // ✅ Generate JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: rememberMe ? '7d' : '1h' }
-    )
+    );
 
-    // ✅ Set cookie with domain for correct frontend-backend cookie handling
+    // ✅ Set secure cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: false, // ✅ true if using HTTPS
-      sameSite: 'lax',
-      domain: '192.168.1.11', // ✅ VERY IMPORTANT: match backend IP
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
       maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
-    })
+    });
 
     res.json({
       message: 'Login successful',
@@ -46,54 +47,64 @@ export const login = async (req, res) => {
         email: user.email,
         role: user.role,
       },
-    })
+    });
   } catch (err) {
-    console.error('❌ Login error:', err.message)
-    res.status(500).json({ message: 'Login failed' })
+    console.error('❌ Login error:', err.message);
+    res.status(500).json({ message: 'Login failed' });
   }
-}
+};
 
 // 👤 GET CURRENT USER
 export const getMe = async (req, res) => {
-  const token = req.cookies.token
-  console.log('🔍 Incoming token cookie:', token)
+  const token = req.cookies.token;
+  console.log('🔍 Incoming token cookie:', token);
 
   if (!token) {
-    return res.status(401).json({ message: 'Not logged in' })
+    return res.status(401).json({ message: 'Not logged in' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    console.log('✅ Decoded JWT:', decoded)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Decoded JWT:', decoded);
 
     const { data: user, error } = await supabase
       .from('users')
       .select('id, name, email, role')
       .eq('id', decoded.id)
-      .single()
+      .single();
 
     if (error || !user) {
-      return res.status(404).json({ message: 'User not found' })
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ user })
+    res.json({ user });
   } catch (err) {
-    console.error('❌ Token decode error:', err.message)
+    console.error('❌ Token decode error:', err.message);
     res.clearCookie('token', {
-      domain: '192.168.1.11',
       httpOnly: true,
-      sameSite: 'lax',
-    })
-    res.status(401).json({ message: 'Invalid token' })
+      sameSite: 'Lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    res.status(401).json({ message: 'Invalid token' });
   }
-}
+};
+
+// 🔓 LOGOUT
+export const logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+  res.json({ message: 'Logged out successfully' });
+};
 
 // 📝 REGISTER
 export const register = async (req, res) => {
-  const { name, email, password, role = 'customer' } = req.body
+  const { name, email, password, role = 'customer' } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required' })
+    return res.status(400).json({ message: 'All fields are required' });
   }
 
   try {
@@ -101,28 +112,28 @@ export const register = async (req, res) => {
       .from('users')
       .select('id')
       .eq('email', email)
-      .maybeSingle()
+      .maybeSingle();
 
     if (existingUser) {
-      return res.status(409).json({ message: 'Email already registered' })
+      return res.status(409).json({ message: 'Email already registered' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const { data: newUser, error } = await supabase
       .from('users')
       .insert([{ name, email, password: hashedPassword, role }])
       .select('id, name, email, role')
-      .single()
+      .single();
 
-    if (error) throw error
+    if (error) throw error;
 
     res.status(201).json({
       message: 'User registered successfully',
       user: newUser,
-    })
+    });
   } catch (err) {
-    console.error('❌ Register error:', err.message)
-    res.status(500).json({ message: 'Registration failed' })
+    console.error('❌ Register error:', err.message);
+    res.status(500).json({ message: 'Registration failed' });
   }
-}
+};

@@ -2,7 +2,7 @@
 
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { login, getMe, register } from '../controllers/authController.js';
+import { login, getMe, register, logout } from '../controllers/authController.js'; // ✅ include logout
 import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -16,19 +16,12 @@ const authLimiter = rateLimit({
   },
 });
 
-// ✅ Apply limiter
+// ✅ Apply limiter to auth routes
 router.post('/login', authLimiter, login);
 router.post('/register', authLimiter, register);
 router.get('/me', requireAuth, getMe);
 
-// ✅ Logout route
-router.post('/logout', (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    sameSite: 'Lax', // adjust depending on frontend/backend domains
-    secure: false,   // set to true if using HTTPS
-  });
-  res.json({ message: 'Logged out successfully' });
-});
+// ✅ Logout route (now using controller)
+router.post('/logout', logout);
 
 export default router;
