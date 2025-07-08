@@ -47,7 +47,8 @@ app.use('/uploads', (req, res, next) => {
 
 // ✅ CORS config
 const allowedOrigins = [
-  'https://triptask.vercel.app/',
+  'https://triptask-frontend.vercel.app',
+  'https://triptask.vercel.app',
   'http://localhost:3000',
   'http://192.168.1.3:3000',
   'http://192.168.1.11:3000',
