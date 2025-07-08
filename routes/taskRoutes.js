@@ -1,6 +1,7 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from '../middleware/authMiddleware.js';
+import { checkServiceOnline } from '../middleware/checkServiceOnline.js';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
@@ -12,7 +13,7 @@ const supabase = createClient(
 
 // ✅ Rate limiters
 const createLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: 5,
   message: { message: '⛔ Too many task submissions. Please try again later.' },
 });
@@ -106,7 +107,7 @@ router.get('/history', requireAuth, async (req, res) => {
 });
 
 // 📝 Create a new task (customer)
-router.post('/', requireAuth, createLimiter, async (req, res) => {
+router.post('/', requireAuth, checkServiceOnline, createLimiter, async (req, res) => {
   const { name, task, pickup, dropoff, datetime, notes } = req.body;
   if (!name || !task || !pickup || !dropoff || !datetime) {
     return res.status(400).json({ message: 'Missing required fields' });
@@ -137,8 +138,8 @@ router.post('/', requireAuth, createLimiter, async (req, res) => {
   }
 });
 
-// 🔄 Update task
-router.put('/:id', requireAuth, updateLimiter, async (req, res) => {
+// 🔄 Update task (status, details)
+router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ message: 'Invalid task ID' });
 
@@ -197,7 +198,7 @@ router.put('/:id', requireAuth, updateLimiter, async (req, res) => {
 });
 
 // ❌ Cancel task (customer)
-router.delete('/:id', requireAuth, deleteLimiter, async (req, res) => {
+router.delete('/:id', requireAuth, checkServiceOnline, deleteLimiter, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ message: 'Invalid task ID' });
 

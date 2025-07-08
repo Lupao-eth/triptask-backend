@@ -5,6 +5,7 @@ import express from 'express';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from '../middleware/authMiddleware.js';
+import { checkServiceOnline } from '../middleware/checkServiceOnline.js';
 import { v4 as uuidv4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
@@ -35,7 +36,7 @@ const upload = multer({
 const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
-  message: { message: '⛔ Too many uploads. Try again later.' },
+  message: { message: 'Too many uploads. Try again later.' },
 });
 
 // ✅ GET /chats/:taskId
@@ -71,7 +72,7 @@ router.get('/:taskId', async (req, res) => {
               return {
                 url: signedData?.signedUrl || '',
                 type: fileObj.type,
-                name: fileObj.name || null, // ✅ Keep name if provided
+                name: fileObj.name || null,
               };
             })
           );
@@ -89,8 +90,8 @@ router.get('/:taskId', async (req, res) => {
   }
 });
 
-// ✅ POST /chats
-router.post('/', requireAuth, async (req, res) => {
+// ✅ POST /chats — protected by auth + service check
+router.post('/', requireAuth, checkServiceOnline, async (req, res) => {
   const { taskId, sender, text, fileUrls } = req.body;
 
   if (!taskId || !sender || (!text?.trim() && (!fileUrls || fileUrls.length === 0))) {
@@ -102,15 +103,13 @@ router.post('/', requireAuth, async (req, res) => {
 
     const { data, error } = await supabase
       .from('chats')
-      .insert([
-        {
-          task_id: taskId,
-          sender,
-          text: text || '',
-          file_urls: parsedFileUrls, // ✅ Now contains name
-          timestamp: new Date().toISOString(),
-        },
-      ])
+      .insert([{
+        task_id: taskId,
+        sender,
+        text: text || '',
+        file_urls: parsedFileUrls,
+        timestamp: new Date().toISOString(),
+      }])
       .select()
       .single();
 
@@ -124,8 +123,8 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-// ✅ POST /chats/upload — now returns filename
-router.post('/upload', requireAuth, uploadLimiter, upload.single('file'), async (req, res) => {
+// ✅ POST /chats/upload — protected by auth + service check + limiter
+router.post('/upload', requireAuth, checkServiceOnline, uploadLimiter, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
   try {
@@ -147,7 +146,7 @@ router.post('/upload', requireAuth, uploadLimiter, upload.single('file'), async 
     res.status(200).json({
       url: filepath,
       type: req.file.mimetype,
-      name: req.file.originalname, // ✅ Return original filename
+      name: req.file.originalname,
     });
   } catch (err) {
     console.error('❌ Upload error:', err.message);
