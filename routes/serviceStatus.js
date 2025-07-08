@@ -30,9 +30,10 @@ router.get('/', async (req, res) => {
 
 // ✅ PUT to update service status (admin-only)
 router.put('/', requireAuth, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden: Only admin can update status' })
-  }
+  if (req.user.role !== 'admin' && req.user.role !== 'rider') {
+  return res.status(403).json({ message: 'Forbidden: Only admin or rider can update status' })
+}
+
 
   const { isOnline } = req.body
   if (typeof isOnline !== 'boolean') {
