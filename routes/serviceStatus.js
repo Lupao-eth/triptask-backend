@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ✅ PUT /service-status — update status (admin or rider only)
+// ✅ PUT /service-status — update status and emit real-time update
 router.put('/', requireAuth, async (req, res) => {
   const { isOnline } = req.body;
 
@@ -62,11 +62,11 @@ router.put('/', requireAuth, async (req, res) => {
       return res.status(500).json({ message: 'Error updating service status' });
     }
 
-    // ✅ Emit update to all connected clients
+    // ✅ Emit real-time event with correct name
     const io = req.app.get('io');
     if (io) {
-      io.emit('serviceStatusChanged', isOnline); // 👈 make sure frontend listens to this
-      console.log('📢 Emitted serviceStatusChanged:', isOnline);
+      io.emit('service-status', { isOnline }); // 👈 must match frontend
+      console.log('📢 Emitted "service-status":', isOnline);
     }
 
     console.log(`🔧 Service status updated to: ${isOnline ? 'Online' : 'Offline'}`);
