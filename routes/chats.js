@@ -114,11 +114,11 @@ router.post('/', requireAuth, checkServiceOnline, async (req, res) => {
     // Emit real-time chat message
     const io = req.app.get('io');
     if (io) {
-      io.to(`task-${taskId}`).emit('newMessage', data); // 🔁 fixed room name + event name
-      console.log('📢 Emitted newMessage → task-' + taskId);
+      io.to(`chat-${taskId}`).emit('new-message', data); // 🔁 fixed room name + event name
+      console.log('📢 Emitted new-message → task-' + taskId);
     }
 
-    console.log(`✅ Chat saved for task-${taskId}`);
+    console.log(`✅ Chat saved for chat-${taskId}`);
     res.status(201).json(data);
   } catch (err) {
     console.error('❌ POST /chats error:', err.message);
