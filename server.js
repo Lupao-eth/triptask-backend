@@ -38,9 +38,21 @@ const io = new SocketServer(server, {
 // ✅ Make io available to all routes
 app.set('io', io);
 
-// ✅ Listen for connections
+// ✅ Handle Socket.IO client connections
 io.on('connection', (socket) => {
   console.log('📡 Client connected to Socket.IO');
+
+  socket.on('joinTaskRoom', (taskId) => {
+    const room = `task-${taskId}`;
+    socket.join(room);
+    console.log(`👥 Socket joined room: ${room}`);
+  });
+
+  socket.on('leaveTaskRoom', (taskId) => {
+    const room = `task-${taskId}`;
+    socket.leave(room);
+    console.log(`🚪 Socket left room: ${room}`);
+  });
 
   socket.on('disconnect', () => {
     console.log('❌ Client disconnected');
@@ -57,7 +69,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Serve /uploads with auto-download for non-images
+// ✅ Serve static files or download
 app.use('/uploads', (req, res, next) => {
   const filePath = path.join(uploadDir, req.path);
   const ext = path.extname(filePath).toLowerCase();

@@ -154,20 +154,22 @@ router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, r
 
     if (getError || !task) return res.status(404).json({ message: 'Task not found' });
 
+    let updated = null;
+
     if (req.user.role === 'customer') {
       if (task.user_id !== req.user.id || task.status !== 'pending') {
         return res.status(403).json({ message: 'Only your pending tasks can be updated' });
       }
 
-      const { data: updated, error } = await supabase
+      const result = await supabase
         .from('tasks')
         .update({ name, pickup, dropoff, datetime, notes })
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
-      return res.json(updated);
+      if (result.error) throw result.error;
+      updated = result.data;
     }
 
     if (req.user.role === 'rider') {
@@ -179,18 +181,27 @@ router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, r
         updateFields.status = status;
       }
 
-      const { data: updated, error } = await supabase
+      const result = await supabase
         .from('tasks')
         .update(updateFields)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
-      return res.json({ message: 'Task updated', task: updated });
+      if (result.error) throw result.error;
+      updated = result.data;
     }
 
-    return res.status(403).json({ message: 'Unauthorized update' });
+    if (!updated) return res.status(403).json({ message: 'Unauthorized update' });
+
+    // Emit Socket.IO task update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat-${id}`).emit('status-update', { status: updated.status });
+      console.log(`📢 Emitted status-update → chat-${id}`);
+    }
+
+    return res.json({ message: 'Task updated', task: updated });
   } catch (err) {
     console.error('❌ Failed to update task:', err.message);
     res.status(500).json({ message: 'Failed to update task' });
@@ -223,6 +234,14 @@ router.delete('/:id', requireAuth, checkServiceOnline, deleteLimiter, async (req
       .single();
 
     if (updateError) throw updateError;
+
+    // Emit cancel update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat-${id}`).emit('status-update', { status: updatedTask.status });
+      console.log(`📢 Emitted taskUpdated (cancelled) → task-${id}`);
+    }
+
     res.json({ message: 'Task cancelled successfully', task: updatedTask });
   } catch (err) {
     console.error('❌ Failed to cancel task:', err.message);
