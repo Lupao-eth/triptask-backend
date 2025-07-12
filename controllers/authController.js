@@ -39,6 +39,7 @@ export const login = async (req, res) => {
 
     res.json({
       message: 'Login successful',
+      token,
       user: {
         id: user.id,
         name: user.name,
@@ -55,7 +56,7 @@ export const login = async (req, res) => {
 // 👤 GET CURRENT USER
 export const getMe = async (req, res) => {
   const token = req.cookies.token;
-  console.log('🔍 Incoming token cookie:', token);
+  
 
   if (!token) {
     return res.status(401).json({ message: 'Not logged in' });
@@ -63,7 +64,7 @@ export const getMe = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Decoded JWT:', decoded);
+    
 
     const { data: user, error } = await supabase
       .from('users')

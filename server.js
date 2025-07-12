@@ -18,10 +18,12 @@ import chatRoutes from './routes/chats.js';
 import userRoutes from './routes/users.js';
 import serviceStatusRoutes from './routes/serviceStatus.js';
 
+import { verifySocketToken } from './middleware/authMiddleware.js';
+
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Setup Socket.IO
+// ✅ Setup Socket.IO with CORS
 const io = new SocketServer(server, {
   cors: {
     origin: [
@@ -35,58 +37,70 @@ const io = new SocketServer(server, {
   },
 });
 
-// ✅ Make io available to all routes
-app.set('io', io);
+// ✅ Authenticate token from frontend during Socket.IO handshake
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    console.log('❌ No token provided in Socket.IO auth');
+    return next(new Error('Authentication error'));
+  }
 
-// ✅ Handle Socket.IO client connections
+  const user = verifySocketToken(token);
+  if (!user) {
+    return next(new Error('Authentication error'));
+  }
+
+  socket.user = user; // Attach user info to socket
+  next();
+});
+
+// ✅ Handle Socket.IO connections
 io.on('connection', (socket) => {
-  console.log('📡 Client connected to Socket.IO');
+  console.log(`📡 Socket.IO connected: ${socket.user.email} (${socket.user.id})`);
 
   socket.on('join', (room) => {
-  socket.join(room);
-  console.log(`👥 Joined room: ${room}`);
-});
-
+    socket.join(room);
+    console.log(`👥 ${socket.user.email} joined room: ${room}`);
+  });
 
   socket.on('leave', (room) => {
-  socket.leave(room);
-  console.log(`🚪 Left room: ${room}`);
-});
-
+    socket.leave(room);
+    console.log(`🚪 ${socket.user.email} left room: ${room}`);
+  });
 
   socket.on('disconnect', () => {
-    console.log('❌ Client disconnected');
+    console.log(`❌ Socket.IO disconnected: ${socket.user.email}`);
   });
 });
 
-// ✅ __dirname support for ES modules
+// ✅ Make io available to all routes
+app.set('io', io);
+
+// ✅ __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Ensure /uploads folder exists
+// ✅ Ensure /uploads directory exists
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Serve static files or download
+// ✅ Serve static or downloadable files
 app.use('/uploads', (req, res, next) => {
   const filePath = path.join(uploadDir, req.path);
   const ext = path.extname(filePath).toLowerCase();
   const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
 
   if (fs.existsSync(filePath)) {
-    if (!isImage) {
-      return res.download(filePath);
-    } else {
-      return express.static(uploadDir)(req, res, next);
-    }
+    if (!isImage) return res.download(filePath);
+    return express.static(uploadDir)(req, res, next);
   } else {
     res.status(404).send('File not found');
   }
 });
 
-// ✅ CORS settings
+// ✅ CORS
 const allowedOrigins = [
   'https://triptask-frontend.vercel.app',
   'https://triptask.vercel.app',
@@ -109,7 +123,7 @@ app.use(
   })
 );
 
-// ✅ Global rate limiting
+// ✅ Rate limiting
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -126,7 +140,7 @@ app.use('/auth', authRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/chats', chatRoutes);
 app.use('/users', userRoutes);
-app.use('/service-status', serviceStatusRoutes); // will emit Socket.IO update
+app.use('/service-status', serviceStatusRoutes);
 
 // ✅ Start server
 const PORT = process.env.PORT || 5000;
