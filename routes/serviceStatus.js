@@ -61,6 +61,10 @@ router.put('/', requireAuth, async (req, res) => {
       return res.status(500).json({ message: 'Error updating service status' });
     }
 
+    // ✅ Emit real-time update using Socket.IO
+    const io = req.app.get('io');
+    io.emit('service-status', { isOnline });
+
     console.log(`🔧 Service status updated to: ${isOnline ? 'Online' : 'Offline'}`);
     return res.json({ message: 'Service status updated successfully' });
   } catch (err) {

@@ -1,3 +1,4 @@
+// backend/middleware/checkServiceOnline.js
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -11,10 +12,11 @@ export const checkServiceOnline = async (req, res, next) => {
     const { data, error } = await supabase
       .from('service_status')
       .select('is_online')
+      .eq('id', 1)
       .single();
 
     if (error) {
-      console.error('Error checking service status:', error);
+      console.error('❌ Error checking service status:', error);
       return res.status(500).json({ error: 'Unable to verify service status.' });
     }
 
@@ -22,9 +24,9 @@ export const checkServiceOnline = async (req, res, next) => {
       return res.status(403).json({ error: 'Service is currently offline.' });
     }
 
-    next(); // Continue if online
+    next();
   } catch (err) {
-    console.error('Unexpected error in service check:', err);
+    console.error('❌ Unexpected error in service check:', err);
     return res.status(500).json({ error: 'Unexpected error checking service status.' });
   }
 };
