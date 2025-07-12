@@ -42,17 +42,17 @@ app.set('io', io);
 io.on('connection', (socket) => {
   console.log('📡 Client connected to Socket.IO');
 
-  socket.on('joinTaskRoom', (taskId) => {
-    const room = `task-${taskId}`;
-    socket.join(room);
-    console.log(`👥 Socket joined room: ${room}`);
-  });
+  socket.on('join', (room) => {
+  socket.join(room);
+  console.log(`👥 Joined room: ${room}`);
+});
 
-  socket.on('leaveTaskRoom', (taskId) => {
-    const room = `task-${taskId}`;
-    socket.leave(room);
-    console.log(`🚪 Socket left room: ${room}`);
-  });
+
+  socket.on('leave', (room) => {
+  socket.leave(room);
+  console.log(`🚪 Left room: ${room}`);
+});
+
 
   socket.on('disconnect', () => {
     console.log('❌ Client disconnected');
