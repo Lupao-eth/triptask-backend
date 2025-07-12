@@ -25,9 +25,10 @@ router.get('/', async (req, res) => {
 
     if (error || !data) {
       console.error('❌ Failed to fetch status:', error?.message);
-      return res.status(500).json({ isOnline: true }); // assume online if error
+      return res.status(500).json({ isOnline: true }); // default to online on error
     }
 
+    console.log('✅ GET /service-status →', data.is_online);
     return res.json({ isOnline: data.is_online });
   } catch (err) {
     console.error('❌ Unexpected error:', err.message);
@@ -39,12 +40,12 @@ router.get('/', async (req, res) => {
 router.put('/', requireAuth, async (req, res) => {
   const { isOnline } = req.body;
 
-  if (req.user.role !== 'admin' && req.user.role !== 'rider') {
-    return res.status(403).json({ message: 'Forbidden: Only admin or rider can update status' });
-  }
-
   if (typeof isOnline !== 'boolean') {
     return res.status(400).json({ message: 'Invalid "isOnline" value' });
+  }
+
+  if (req.user.role !== 'admin' && req.user.role !== 'rider') {
+    return res.status(403).json({ message: 'Forbidden: Only admin or rider can update status' });
   }
 
   try {
@@ -61,9 +62,12 @@ router.put('/', requireAuth, async (req, res) => {
       return res.status(500).json({ message: 'Error updating service status' });
     }
 
-    // ✅ Emit real-time update using Socket.IO
+    // ✅ Emit update to all connected clients
     const io = req.app.get('io');
-    io.emit('service-status', { isOnline });
+    if (io) {
+      io.emit('serviceStatusChanged', isOnline); // 👈 make sure frontend listens to this
+      console.log('📢 Emitted serviceStatusChanged:', isOnline);
+    }
 
     console.log(`🔧 Service status updated to: ${isOnline ? 'Online' : 'Offline'}`);
     return res.json({ message: 'Service status updated successfully' });

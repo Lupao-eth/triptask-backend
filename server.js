@@ -20,6 +20,8 @@ import serviceStatusRoutes from './routes/serviceStatus.js';
 
 const app = express();
 const server = http.createServer(app);
+
+// ✅ Setup Socket.IO
 const io = new SocketServer(server, {
   cors: {
     origin: [
@@ -33,28 +35,29 @@ const io = new SocketServer(server, {
   },
 });
 
-// Expose socket for emitting from routes
+// ✅ Make io available to all routes
 app.set('io', io);
 
-// ✅ Handle connection
+// ✅ Listen for connections
 io.on('connection', (socket) => {
   console.log('📡 Client connected to Socket.IO');
+
   socket.on('disconnect', () => {
     console.log('❌ Client disconnected');
   });
 });
 
-// Fix __dirname for ES modules
+// ✅ __dirname support for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure uploads folder exists
+// ✅ Ensure /uploads folder exists
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Serve /uploads: auto-download non-images
+// ✅ Serve /uploads with auto-download for non-images
 app.use('/uploads', (req, res, next) => {
   const filePath = path.join(uploadDir, req.path);
   const ext = path.extname(filePath).toLowerCase();
@@ -71,7 +74,7 @@ app.use('/uploads', (req, res, next) => {
   }
 });
 
-// ✅ CORS config
+// ✅ CORS settings
 const allowedOrigins = [
   'https://triptask-frontend.vercel.app',
   'https://triptask.vercel.app',
@@ -94,7 +97,7 @@ app.use(
   })
 );
 
-// ✅ Global rate limiter
+// ✅ Global rate limiting
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -102,7 +105,7 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// ✅ Middleware
+// ✅ Global middlewares
 app.use(express.json());
 app.use(cookieParser());
 
@@ -111,9 +114,9 @@ app.use('/auth', authRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/chats', chatRoutes);
 app.use('/users', userRoutes);
-app.use('/service-status', serviceStatusRoutes); // ✅ will emit via io from inside this route
+app.use('/service-status', serviceStatusRoutes); // will emit Socket.IO update
 
-// ✅ Start server with Socket.IO
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () =>
   console.log(`✅ Server with Socket.IO running on http://0.0.0.0:${PORT}`)
