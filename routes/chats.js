@@ -4,7 +4,7 @@ dotenv.config();
 import express from 'express';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireBearerAuth } from '../middleware/authMiddleware.js';
 import { checkServiceOnline } from '../middleware/checkServiceOnline.js';
 import { v4 as uuidv4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
@@ -17,11 +17,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Multer storage
+// Multer config
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (allowed.includes(file.mimetype)) cb(null, true);
@@ -35,7 +35,7 @@ const uploadLimiter = rateLimit({
   message: { message: 'Too many uploads. Try again later.' },
 });
 
-// GET /chats/:taskId
+// ✅ GET /chats/:taskId
 router.get('/:taskId', async (req, res) => {
   const taskId = req.params.taskId;
 
@@ -58,7 +58,7 @@ router.get('/:taskId', async (req, res) => {
               const { data: signedData, error: signedErr } = await supabase
                 .storage
                 .from('chat-uploads')
-                .createSignedUrl(fileObj.url, 60 * 60);
+                .createSignedUrl(fileObj.url, 60 * 60); // 1hr
 
               if (signedErr) {
                 console.error('⚠️ Signed URL error:', signedErr.message);
@@ -86,8 +86,8 @@ router.get('/:taskId', async (req, res) => {
   }
 });
 
-// POST /chats
-router.post('/', requireAuth, checkServiceOnline, async (req, res) => {
+// ✅ POST /chats
+router.post('/', requireBearerAuth, checkServiceOnline, async (req, res) => {
   const { taskId, sender, text, fileUrls } = req.body;
 
   if (!taskId || !sender || (!text?.trim() && (!fileUrls || fileUrls.length === 0))) {
@@ -111,11 +111,10 @@ router.post('/', requireAuth, checkServiceOnline, async (req, res) => {
 
     if (error) throw error;
 
-    // Emit real-time chat message
     const io = req.app.get('io');
     if (io) {
-      io.to(`chat-${taskId}`).emit('new-message', data); // 🔁 fixed room name + event name
-      console.log('📢 Emitted new-message → task-' + taskId);
+      io.to(`chat-${taskId}`).emit('new-message', data);
+      console.log('📢 Emitted new-message → chat-' + taskId);
     }
 
     console.log(`✅ Chat saved for chat-${taskId}`);
@@ -126,10 +125,10 @@ router.post('/', requireAuth, checkServiceOnline, async (req, res) => {
   }
 });
 
-// POST /chats/upload
+// ✅ POST /chats/upload
 router.post(
   '/upload',
-  requireAuth,
+  requireBearerAuth,
   checkServiceOnline,
   uploadLimiter,
   upload.single('file'),

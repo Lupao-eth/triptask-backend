@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ Middleware to block requests if service is offline
 export const checkServiceOnline = async (req, res, next) => {
   try {
     const { data, error } = await supabase
@@ -16,18 +15,18 @@ export const checkServiceOnline = async (req, res, next) => {
       .single();
 
     if (error) {
-      console.error('❌ Error checking service status from Supabase:', error.message);
-      return res.status(500).json({ error: 'Unable to verify service status from database.' });
+      console.error('❌ Failed to fetch service status:', error.message);
+      return res.status(500).json({ error: 'Could not verify service status' });
     }
 
     if (!data?.is_online) {
-      console.warn('⚠️ Request blocked: Service is currently offline');
-      return res.status(403).json({ error: 'Service is currently offline. Please try again later.' });
+      console.warn('⚠️ Blocked request: Service is offline');
+      return res.status(403).json({ error: 'Service is currently offline' });
     }
 
     next();
   } catch (err) {
-    console.error('❌ Unexpected error in checkServiceOnline middleware:', err.message);
-    return res.status(500).json({ error: 'Unexpected error checking service status.' });
+    console.error('❌ checkServiceOnline error:', err.message);
+    return res.status(500).json({ error: 'Service check failed' });
   }
 };

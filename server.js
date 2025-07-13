@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -22,7 +21,7 @@ import { verifySocketToken } from './middleware/authMiddleware.js';
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Allowed CORS origins (MUST be exact for Safari)
+// ✅ Allowed frontend origins
 const allowedOrigins = [
   'https://triptask-frontend.vercel.app',
   'https://triptask.vercel.app',
@@ -31,26 +30,26 @@ const allowedOrigins = [
   'http://192.168.1.11:3000',
 ];
 
-// ✅ Setup Socket.IO with strict CORS
+// ✅ Setup Socket.IO with CORS
 const io = new SocketServer(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],
-    credentials: true,
+    credentials: true, // ⚠️ Needed even if you're not using cookies
   },
 });
 
-// ✅ Socket.IO token-based auth middleware (Option B)
+// ✅ Socket.IO Bearer Token Auth
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
-    console.log('❌ No token provided during Socket.IO handshake');
+    console.warn('❌ Socket.IO: Missing token');
     return next(new Error('Authentication error'));
   }
 
   const user = verifySocketToken(token);
   if (!user) {
-    console.log('❌ Invalid token');
+    console.warn('❌ Socket.IO: Invalid token');
     return next(new Error('Authentication error'));
   }
 
@@ -58,18 +57,18 @@ io.use((socket, next) => {
   next();
 });
 
-// ✅ Handle Socket.IO events
+// ✅ Handle real-time socket events
 io.on('connection', (socket) => {
-  console.log(`📡 Connected: ${socket.user.email} (${socket.user.id})`);
+  console.log(`🔌 Connected: ${socket.user.email} (${socket.user.id})`);
 
   socket.on('join', (room) => {
     socket.join(room);
-    console.log(`👥 ${socket.user.email} joined room: ${room}`);
+    console.log(`📥 ${socket.user.email} joined room: ${room}`);
   });
 
   socket.on('leave', (room) => {
     socket.leave(room);
-    console.log(`🚪 ${socket.user.email} left room: ${room}`);
+    console.log(`📤 ${socket.user.email} left room: ${room}`);
   });
 
   socket.on('disconnect', () => {
@@ -77,20 +76,20 @@ io.on('connection', (socket) => {
   });
 });
 
-// ✅ Make io available to all routes
+// ✅ Make io available in routes
 app.set('io', io);
 
-// ✅ __dirname for ES modules
+// ✅ __dirname fix for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Ensure upload folder exists
+// ✅ Ensure uploads dir exists
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Serve static/downloadable files
+// ✅ Serve uploaded files
 app.use('/uploads', (req, res, next) => {
   const filePath = path.join(uploadDir, req.path);
   const ext = path.extname(filePath).toLowerCase();
@@ -107,7 +106,7 @@ app.use('/uploads', (req, res, next) => {
   res.status(404).send('File not found');
 });
 
-// ✅ Setup CORS (same origin check as for Socket.IO)
+// ✅ Apply CORS
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -118,7 +117,7 @@ app.use(
         callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true,
+    credentials: true, // ✅ Required for Safari & Authorization headers
   })
 );
 
@@ -131,10 +130,10 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 
 // ✅ Middleware
-app.use(express.json());
-app.use(cookieParser());
+app.use(express.json()); // ✅ parse JSON body
+// ❌ cookieParser removed — all tokens are now in headers only
 
-// ✅ Routes
+// ✅ API Routes
 app.use('/auth', authRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/chats', chatRoutes);
@@ -144,5 +143,5 @@ app.use('/service-status', serviceStatusRoutes);
 // ✅ Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running with Socket.IO on http://0.0.0.0:${PORT}`);
+  console.log(`✅ Server running at http://0.0.0.0:${PORT}`);
 });

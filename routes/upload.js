@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireBearerAuth } from '../middleware/authMiddleware.js'; // ✅ token-based
 import { checkServiceOnline } from '../middleware/checkServiceOnline.js';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
@@ -37,10 +37,10 @@ const uploadLimiter = rateLimit({
   message: { message: 'Too many uploads. Try again later.' },
 });
 
-// ✅ POST /upload — with auth, service check, limiter
+// ✅ POST /upload — with token auth, service check, limiter
 router.post(
   '/',
-  requireAuth,
+  requireBearerAuth,
   checkServiceOnline,
   uploadLimiter,
   upload.single('file'),
@@ -65,8 +65,11 @@ router.post(
         return res.status(500).json({ message: 'Upload failed' });
       }
 
-      // Only return path — frontend will fetch signed URL
-      res.status(200).json({ url: filePath, type: file.mimetype, name: file.originalname });
+      res.status(200).json({
+        url: filePath,
+        type: file.mimetype,
+        name: file.originalname,
+      });
     } catch (err) {
       console.error('❌ Upload exception:', err.message);
       res.status(500).json({ message: 'Server error during upload' });

@@ -2,27 +2,29 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { login, getMe, register, logout } from '../controllers/authController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireBearerAuth } from '../middleware/authMiddleware.js'; // 🔄 changed from requireAuth
 
 const router = express.Router();
 
-// ✅ Apply rate limit to prevent brute-force login/register attempts
+// ✅ Rate limiter to prevent abuse
 const authLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 5, // limit each IP to 5 requests per minute
+  max: 5,
   message: {
     message: '⛔ Too many attempts. Please try again later.',
   },
 });
 
-// ✅ Auth routes
-router.post('/login', authLimiter, login);       // Login
-router.post('/register', authLimiter, register); // Register
-router.get('/me', requireAuth, getMe);           // Authenticated user info
-router.post('/logout', logout);                  // Logout
+// ✅ Public routes
+router.post('/login', authLimiter, login);
+router.post('/register', authLimiter, register);
 
-// ✅ NEW: Issue JWT token for Socket.IO auth (Option B)
-router.get('/token', requireAuth, (req, res) => {
+// ✅ Protected routes (now using token in header, not cookie)
+router.get('/me', requireBearerAuth, getMe);
+router.post('/logout', logout);
+
+// ✅ Token endpoint (for Socket.IO or client use)
+router.get('/token', requireBearerAuth, (req, res) => {
   try {
     const token = jwt.sign(
       {
@@ -31,7 +33,7 @@ router.get('/token', requireAuth, (req, res) => {
         role: req.user.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // can adjust as needed
+      { expiresIn: '1h' }
     );
 
     res.json({ token });

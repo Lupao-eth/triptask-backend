@@ -1,6 +1,6 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireBearerAuth } from '../middleware/authMiddleware.js';
 import { checkServiceOnline } from '../middleware/checkServiceOnline.js';
 import rateLimit from 'express-rate-limit';
 
@@ -31,7 +31,7 @@ const deleteLimiter = rateLimit({
 });
 
 // 👤 Get all tasks for a customer
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireBearerAuth, async (req, res) => {
   try {
     const { data: tasks, error } = await supabase
       .from('tasks')
@@ -48,7 +48,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // 📦 Available bookings for riders
-router.get('/available', requireAuth, async (req, res) => {
+router.get('/available', requireBearerAuth, async (req, res) => {
   try {
     if (req.user.role !== 'rider') return res.status(403).json({ message: 'Access denied' });
 
@@ -67,7 +67,7 @@ router.get('/available', requireAuth, async (req, res) => {
 });
 
 // 🚚 Active bookings for riders
-router.get('/active', requireAuth, async (req, res) => {
+router.get('/active', requireBearerAuth, async (req, res) => {
   try {
     if (req.user.role !== 'rider') return res.status(403).json({ message: 'Access denied' });
 
@@ -87,7 +87,7 @@ router.get('/active', requireAuth, async (req, res) => {
 });
 
 // ✅ Task history for riders
-router.get('/history', requireAuth, async (req, res) => {
+router.get('/history', requireBearerAuth, async (req, res) => {
   try {
     if (req.user.role !== 'rider') return res.status(403).json({ message: 'Access denied' });
 
@@ -107,7 +107,7 @@ router.get('/history', requireAuth, async (req, res) => {
 });
 
 // 📝 Create a new task (customer)
-router.post('/', requireAuth, checkServiceOnline, createLimiter, async (req, res) => {
+router.post('/', requireBearerAuth, checkServiceOnline, createLimiter, async (req, res) => {
   const { name, task, pickup, dropoff, datetime, notes } = req.body;
   if (!name || !task || !pickup || !dropoff || !datetime) {
     return res.status(400).json({ message: 'Missing required fields' });
@@ -138,8 +138,8 @@ router.post('/', requireAuth, checkServiceOnline, createLimiter, async (req, res
   }
 });
 
-// 🔄 Update task (status, details)
-router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, res) => {
+// 🔄 Update task
+router.put('/:id', requireBearerAuth, checkServiceOnline, updateLimiter, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ message: 'Invalid task ID' });
 
@@ -194,7 +194,7 @@ router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, r
 
     if (!updated) return res.status(403).json({ message: 'Unauthorized update' });
 
-    // Emit Socket.IO task update
+    // Emit status update
     const io = req.app.get('io');
     if (io) {
       io.to(`chat-${id}`).emit('status-update', { status: updated.status });
@@ -208,8 +208,8 @@ router.put('/:id', requireAuth, checkServiceOnline, updateLimiter, async (req, r
   }
 });
 
-// ❌ Cancel task (customer)
-router.delete('/:id', requireAuth, checkServiceOnline, deleteLimiter, async (req, res) => {
+// ❌ Cancel task
+router.delete('/:id', requireBearerAuth, checkServiceOnline, deleteLimiter, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ message: 'Invalid task ID' });
 
@@ -235,7 +235,6 @@ router.delete('/:id', requireAuth, checkServiceOnline, deleteLimiter, async (req
 
     if (updateError) throw updateError;
 
-    // Emit cancel update
     const io = req.app.get('io');
     if (io) {
       io.to(`chat-${id}`).emit('status-update', { status: updatedTask.status });
@@ -249,8 +248,8 @@ router.delete('/:id', requireAuth, checkServiceOnline, deleteLimiter, async (req
   }
 });
 
-// 🔍 Get a single task by ID
-router.get('/:id', requireAuth, async (req, res) => {
+// 🔍 Get single task
+router.get('/:id', requireBearerAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ message: 'Invalid task ID' });
 

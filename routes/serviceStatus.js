@@ -1,7 +1,6 @@
-// backend/routes/serviceStatus.js
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireBearerAuth } from '../middleware/authMiddleware.js'; // ✅ token-based
 
 const router = express.Router();
 
@@ -14,7 +13,7 @@ const supabase = createClient(
 // ✅ Middleware to parse JSON
 router.use(express.json());
 
-// ✅ GET /service-status — return current service status
+// ✅ GET /service-status — public route
 router.get('/', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -25,7 +24,7 @@ router.get('/', async (req, res) => {
 
     if (error || !data) {
       console.error('❌ Failed to fetch status:', error?.message);
-      return res.status(500).json({ isOnline: true }); // default to online on error
+      return res.status(500).json({ isOnline: true }); // fallback to online
     }
 
     console.log('✅ GET /service-status →', data.is_online);
@@ -36,8 +35,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ✅ PUT /service-status — update status and emit real-time update
-router.put('/', requireAuth, async (req, res) => {
+// ✅ PUT /service-status — only admin or rider can update
+router.put('/', requireBearerAuth, async (req, res) => {
   const { isOnline } = req.body;
 
   if (typeof isOnline !== 'boolean') {
@@ -62,10 +61,9 @@ router.put('/', requireAuth, async (req, res) => {
       return res.status(500).json({ message: 'Error updating service status' });
     }
 
-    // ✅ Emit real-time event with correct name
     const io = req.app.get('io');
     if (io) {
-      io.emit('service-status', { isOnline }); // 👈 must match frontend
+      io.emit('service-status', { isOnline });
       console.log('📢 Emitted "service-status":', isOnline);
     }
 
