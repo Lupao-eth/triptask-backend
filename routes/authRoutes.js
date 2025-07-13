@@ -17,11 +17,39 @@ const authLimiter = rateLimit({
 router.post('/login', authLimiter, login);
 router.post('/register', authLimiter, register);
 
+// ✅ Refresh token route — used to get a new access token
+router.post('/refresh', async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: 'Missing refresh token' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+    const newToken = jwt.sign(
+      {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ token: newToken });
+  } catch (err) {
+    console.error('❌ Refresh token error:', err.message);
+    res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+});
+
 // ✅ PROTECTED ROUTES
 router.get('/me', requireBearerAuth, getMe);
 router.post('/logout', logout);
 
-// ✅ ISSUE NEW ACCESS TOKEN IF USER IS AUTHENTICATED
+// ✅ ISSUE NEW ACCESS TOKEN IF USER IS STILL LOGGED IN
 router.get('/token', requireBearerAuth, (req, res) => {
   try {
     const token = jwt.sign(
