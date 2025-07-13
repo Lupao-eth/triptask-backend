@@ -125,7 +125,7 @@ router.post('/', requireBearerAuth, checkServiceOnline, async (req, res) => {
   }
 });
 
-// ✅ POST /chats/upload
+// ✅ POST /chats/upload (FIXED: includes signed URL)
 router.post(
   '/upload',
   requireBearerAuth,
@@ -151,8 +151,16 @@ router.post(
 
       console.log('✅ Uploaded to Supabase:', filepath);
 
+      // ✅ Generate signed URL for preview
+      const { data: signedData, error: signedErr } = await supabase
+        .storage
+        .from('chat-uploads')
+        .createSignedUrl(filepath, 60 * 60 * 24 * 7); // 7 days
+
+      if (signedErr) throw signedErr;
+
       res.status(200).json({
-        url: filepath,
+        url: signedData.signedUrl,
         type: req.file.mimetype,
         name: req.file.originalname,
       });
