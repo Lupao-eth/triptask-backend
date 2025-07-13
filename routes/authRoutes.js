@@ -15,6 +15,7 @@ const authLimiter = rateLimit({
 
 // ✅ PUBLIC ROUTES
 router.post('/login', authLimiter, login);
+router.post('/token', authLimiter, login);
 router.post('/register', authLimiter, register);
 
 // ✅ Refresh token route — used to get a new access token
