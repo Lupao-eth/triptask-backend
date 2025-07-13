@@ -8,13 +8,13 @@ import { requireBearerAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Supabase client (using service role key for secure server-side operations)
+// Supabase client (server-side with service key)
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ Rate limiter to prevent abuse
+// Rate limiting
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -25,11 +25,11 @@ const authLimiter = rateLimit({
 router.post('/login', authLimiter, login);
 router.post('/register', authLimiter, register);
 
-// ✅ Protected routes (Bearer token only)
+// ✅ Protected routes
 router.get('/me', requireBearerAuth, getMe);
 router.post('/logout', logout);
 
-// ✅ GET /auth/token – issue new token from logged-in user
+// ✅ GET /auth/token – issue new access token from a valid user (requires Bearer)
 router.get('/token', requireBearerAuth, (req, res) => {
   try {
     const token = jwt.sign(
@@ -41,7 +41,6 @@ router.get('/token', requireBearerAuth, (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-
     res.json({ token });
   } catch (err) {
     console.error('❌ Token generation error:', err.message);
@@ -49,7 +48,7 @@ router.get('/token', requireBearerAuth, (req, res) => {
   }
 });
 
-// ✅ POST /auth/token – login via email/password → return token
+// ✅ POST /auth/token – login via email/password (frontend login)
 router.post('/token', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
