@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 dotenv.config();
-console.log('🌍 SUPABASE_URL:', process.env.SUPABASE_URL);
 
 import express from 'express';
 import cors from 'cors';
@@ -23,40 +22,45 @@ import { verifySocketToken } from './middleware/authMiddleware.js';
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Setup Socket.IO with CORS
+// ✅ Allowed CORS origins (MUST be exact for Safari)
+const allowedOrigins = [
+  'https://triptask-frontend.vercel.app',
+  'https://triptask.vercel.app',
+  'http://localhost:3000',
+  'http://192.168.1.3:3000',
+  'http://192.168.1.11:3000',
+];
+
+// ✅ Setup Socket.IO with strict CORS
 const io = new SocketServer(server, {
   cors: {
-    origin: [
-      'https://triptask-frontend.vercel.app',
-      'https://triptask.vercel.app',
-      'http://localhost:3000',
-      'http://192.168.1.3:3000',
-      'http://192.168.1.11:3000',
-    ],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-// ✅ Authenticate token from frontend during Socket.IO handshake
+// ✅ Socket.IO token-based auth middleware (Option B)
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
-    console.log('❌ No token provided in Socket.IO auth');
+    console.log('❌ No token provided during Socket.IO handshake');
     return next(new Error('Authentication error'));
   }
 
   const user = verifySocketToken(token);
   if (!user) {
+    console.log('❌ Invalid token');
     return next(new Error('Authentication error'));
   }
 
-  socket.user = user; // Attach user info to socket
+  socket.user = user;
   next();
 });
 
-// ✅ Handle Socket.IO connections
+// ✅ Handle Socket.IO events
 io.on('connection', (socket) => {
-  console.log(`📡 Socket.IO connected: ${socket.user.email} (${socket.user.id})`);
+  console.log(`📡 Connected: ${socket.user.email} (${socket.user.id})`);
 
   socket.on('join', (room) => {
     socket.join(room);
@@ -69,7 +73,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`❌ Socket.IO disconnected: ${socket.user.email}`);
+    console.log(`❌ Disconnected: ${socket.user.email}`);
   });
 });
 
@@ -80,42 +84,37 @@ app.set('io', io);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Ensure /uploads directory exists
+// ✅ Ensure upload folder exists
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Serve static or downloadable files
+// ✅ Serve static/downloadable files
 app.use('/uploads', (req, res, next) => {
   const filePath = path.join(uploadDir, req.path);
   const ext = path.extname(filePath).toLowerCase();
   const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
 
   if (fs.existsSync(filePath)) {
-    if (!isImage) return res.download(filePath);
-    return express.static(uploadDir)(req, res, next);
-  } else {
-    res.status(404).send('File not found');
+    if (isImage) {
+      return express.static(uploadDir)(req, res, next);
+    } else {
+      return res.download(filePath);
+    }
   }
+
+  res.status(404).send('File not found');
 });
 
-// ✅ CORS
-const allowedOrigins = [
-  'https://triptask-frontend.vercel.app',
-  'https://triptask.vercel.app',
-  'http://localhost:3000',
-  'http://192.168.1.3:3000',
-  'http://192.168.1.11:3000',
-];
-
+// ✅ Setup CORS (same origin check as for Socket.IO)
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.warn(`❌ CORS blocked: ${origin}`);
+        console.warn(`❌ Blocked CORS origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -123,7 +122,7 @@ app.use(
   })
 );
 
-// ✅ Rate limiting
+// ✅ Global rate limiter
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -131,7 +130,7 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// ✅ Global middlewares
+// ✅ Middleware
 app.use(express.json());
 app.use(cookieParser());
 
@@ -144,6 +143,6 @@ app.use('/service-status', serviceStatusRoutes);
 
 // ✅ Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () =>
-  console.log(`✅ Server with Socket.IO running on http://0.0.0.0:${PORT}`)
-);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running with Socket.IO on http://0.0.0.0:${PORT}`);
+});
