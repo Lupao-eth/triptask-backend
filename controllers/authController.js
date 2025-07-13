@@ -3,7 +3,15 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import supabase from '../config/supabaseClient.js';
 
-// 🔐 LOGIN — issues JWT in response body
+const JWT_SECRET = process.env.JWT_SECRET;
+const ACCESS_TOKEN_EXPIRES_IN = '1h';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+// ✅ Helper to sign tokens
+const signToken = (payload, expiresIn) =>
+  jwt.sign(payload, JWT_SECRET, { expiresIn });
+
+// 🔐 POST /auth/token — login and issue token + refreshToken
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -20,18 +28,21 @@ export const login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Wrong password' });
+      return res.status(401).json({ message: 'Incorrect password' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' } // long-lived
-    );
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const token = signToken(payload, ACCESS_TOKEN_EXPIRES_IN);
+    const refreshToken = signToken(payload, REFRESH_TOKEN_EXPIRES_IN);
 
     res.json({
-      message: 'Login successful',
       token,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -45,17 +56,17 @@ export const login = async (req, res) => {
   }
 };
 
-// 👤 GET CURRENT USER — reads token from Authorization header
+// 👤 GET /auth/me — Get current user from Bearer token
 export const getMe = async (req, res) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Not logged in' });
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Unauthorized' });
   }
 
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     const { data: user, error } = await supabase
       .from('users')
@@ -69,12 +80,12 @@ export const getMe = async (req, res) => {
 
     res.json({ user });
   } catch (err) {
-    console.error('❌ Token decode error:', err.message);
-    return res.status(401).json({ message: 'Invalid token' });
+    console.error('❌ Token verification error:', err.message);
+    res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
 
-// 📝 REGISTER — same as before
+// 📝 POST /auth/register — create user in Supabase
 export const register = async (req, res) => {
   const { name, email, password, role = 'customer' } = req.body;
 
@@ -113,7 +124,7 @@ export const register = async (req, res) => {
   }
 };
 
-// 🚫 LOGOUT — not needed with token-based auth
-export const logout = (req, res) => {
-  return res.json({ message: 'Client can simply discard the token' });
+// 🚫 POST /auth/logout — client-side only
+export const logout = (_req, res) => {
+  return res.json({ message: 'Client can discard token on logout' });
 };
