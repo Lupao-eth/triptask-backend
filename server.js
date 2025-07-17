@@ -21,6 +21,10 @@ import { verifySocketToken } from './middleware/authMiddleware.js';
 const app = express();
 const server = http.createServer(app);
 
+// ✅ __dirname fix (ESM)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // ✅ Allowed frontend origins
 const allowedOrigins = [
   'https://triptask-frontend.vercel.app',
@@ -30,34 +34,26 @@ const allowedOrigins = [
   'http://192.168.1.11:3000',
 ];
 
-// ✅ Setup Socket.IO with CORS
+// ✅ Setup Socket.IO with token-based auth
 const io = new SocketServer(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],
-    credentials: true, // ⚠️ Needed even if you're not using cookies
+    credentials: true,
   },
 });
 
-// ✅ Socket.IO Bearer Token Auth
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
-  if (!token) {
-    console.warn('❌ Socket.IO: Missing token');
-    return next(new Error('Authentication error'));
-  }
+  if (!token) return next(new Error('Missing token'));
 
   const user = verifySocketToken(token);
-  if (!user) {
-    console.warn('❌ Socket.IO: Invalid token');
-    return next(new Error('Authentication error'));
-  }
+  if (!user) return next(new Error('Invalid token'));
 
   socket.user = user;
   next();
 });
 
-// ✅ Handle real-time socket events
 io.on('connection', (socket) => {
   console.log(`🔌 Connected: ${socket.user.email} (${socket.user.id})`);
 
@@ -76,14 +72,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// ✅ Make io available in routes
+// ✅ Make io instance available in routes
 app.set('io', io);
 
-// ✅ __dirname fix for ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ✅ Ensure uploads dir exists
+// ✅ Ensure public/uploads directory exists
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -117,21 +109,22 @@ app.use(
         callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true, // ✅ Required for Safari & Authorization headers
+    credentials: true,
   })
 );
 
 // ✅ Global rate limiter
-const globalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  message: '⏱ Too many requests. Please try again later.',
-});
-app.use(globalLimiter);
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    message: '⏱ Too many requests. Please try again later.',
+  })
+);
 
 // ✅ Middleware
-app.use(express.json()); // ✅ parse JSON body
-// ❌ cookieParser removed — all tokens are now in headers only
+app.use(express.json()); // JSON parser
+// No cookie-parser — token comes from headers only
 
 // ✅ API Routes
 app.use('/auth', authRoutes);
